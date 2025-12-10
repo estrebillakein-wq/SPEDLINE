@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Research Hub — Presentation</title>
+
+  <!--
+    Single-file polished Research Hub for a VS Code presentation.
+    - Role-based (Student / Teacher) simulated login (no server)
+    - File uploads (stores metadata locally; shows preview & download if supported)
+    - Color-coded teacher dashboard with filters/sort
+    - Interactive charts (Chart.js) for analytics
+    - Export CSV, sample data preloaded
+    - Runs on Live Server or any static server
+  -->
+
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg-1: #071028; --bg-2:#0f1f3a; --card:#0f2740;
+      --accent: #00d4c0; --muted: rgba(255,255,255,0.7);
+      --glass: rgba(255,255,255,0.04);
+      --success:#28c76f; --warn:#ffb020; --danger:#ff6b6b;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,Arial;background:linear-gradient(160deg,var(--bg-1),var(--bg-2));color:#e9f6f4}
+    a{color:var(--accent)}
+
+    header{display:flex;align-items:center;justify-content:space-between;padding:18px 28px}
+    header h1{margin:0;font-size:18px;letter-spacing:0.2px}
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#00f5d4,#0077ff);display:flex;align-items:center;justify-content:center;font-weight:800;color:#022;box-shadow:0 6px 20px rgba(2,39,71,0.6)}
+
+    main{max-width:1200px;margin:18px auto;padding:18px}
+    .grid{display:grid;grid-template-columns:360px 1fr;gap:18px}
+
+    .card{background:var(--glass);backdrop-filter: blur(8px);padding:16px;border-radius:12px;box-shadow:0 8px 30px rgba(2,16,32,0.6)}
+    .center{text-align:center}
+    .hidden{display:none}
+
+    input,select,button{font-size:14px;padding:10px;border-radius:8px;border:none;outline:none}
+    input,select{width:100%;margin:6px 0}
+    button{cursor:pointer}
+
+    .muted{color:var(--muted);font-size:13px}
+
+    /* login */
+    .login-card{display:flex;flex-direction:column;gap:8px;align-items:stretch}
+    .role-pill{display:flex;gap:6px}
+    .pill{padding:8px 10px;border-radius:999px;background:transparent;border:1px solid rgba(255,255,255,0.06);cursor:pointer}
+    .pill.active{background:linear-gradient(90deg,var(--accent),#0077ff);color:#022;border:none}
+
+    /* student panel */
+    .file-meta{display:flex;align-items:center;gap:10px}
+    .file-preview{font-size:13px;color:var(--muted)}
+    .progress{height:14px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;margin-top:8px}
+    .progress > span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#0077ff);width:0%;transition:width 600ms ease}
+
+    /* teacher table */
+    .table-wrap{overflow:auto;max-height:420px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.04);text-align:left}
+    th{position:sticky;top:0;background:transparent;font-weight:700}
+    td.status{width:120px;text-align:center;border-radius:8px}
+
+    .green{background:linear-gradient(180deg, rgba(40,199,111,0.14), rgba(40,199,111,0.06));color:var(--success);font-weight:600}
+    .yellow{background:linear-gradient(180deg, rgba(255,176,32,0.12), rgba(255,176,32,0.04));color:var(--warn);font-weight:600}
+    .red{background:linear-gradient(180deg, rgba(255,107,107,0.12), rgba(255,107,107,0.04));color:var(--danger);font-weight:600}
+
+    .toolbar{display:flex;gap:8px;align-items:center}
+    .ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:8px;color:var(--muted)}
+
+    /* charts */
+    .charts{display:flex;gap:12px;margin-top:12px}
+    .chart-card{flex:1;padding:12px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent)}
+
+    footer{margin-top:18px;text-align:center;color:rgba(255,255,255,0.45);font-size:13px}
+
+    /* responsive */
+    @media (max-width:980px){.grid{grid-template-columns:1fr;}.charts{flex-direction:column}}
+
+    /* micro animations */
+    .fade-in{animation:fadeIn .5s ease both}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  </style>
+
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo">SPED</div>
+      <div>
+        <h1>SPEDLINE </h1>
+        <div class="muted">Polished local demo · VS Code / Live Server</div>
+      </div>
+    </div>
+    <div id="topControls" class="toolbar">
+      <button id="btnReset" class="ghost" title="Reset demo data">Reset</button>
+      <button id="btnSample" class="ghost" title="Load sample students">Load Sample</button>
+      <button id="btnExport" class="ghost" title="Export CSV of progress">Export CSV</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="grid">
+      <!-- LEFT: Login / Student panel -->
+      <div>
+        <section id="loginCard" class="card login-card fade-in">
+          <div class="center"><strong>Sign in (demo)</strong></div>
+          <input id="nameInput" placeholder="Enter full name (e.g. Juan Dela Cruz)" />
+
+          <div class="role-pill">
+            <div id="pillStudent" class="pill active">Student</div>
+            <div id="pillTeacher" class="pill">Teacher</div>
+          </div>
+
+          <div style="display:flex;gap:8px">
+            <button id="btnEnter">Enter</button>
+            <button id="btnGuest" class="ghost">Quick Guest</button>
+          </div>
+
+          <div id="userInfo" class="muted" style="margin-top:10px">No one signed in</div>
+        </section>
+
+        <section id="studentPanel" class="card hidden fade-in" aria-hidden="true">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <strong>Student Upload</strong>
+            <small class="muted">Role: <span id="studentNameLabel"></span></small>
+          </div>
+
+          <label for="stageSelect" class="muted">Select stage</label>
+          <select id="stageSelect">
+            <option value="Title">Research Title</option>
+            <option value="Chapter 1">Chapter 1</option>
+            <option value="Chapter 2">Chapter 2</option>
+            <option value="Final Output">Final Output</option>
+          </select>
+
+          <input type="file" id="fileInput" />
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button id="btnUpload">Upload</button>
+            <button id="btnSaveLocal" class="ghost">Save Draft</button>
+          </div>
+
+          <div class="progress" aria-hidden="true"><span id="progressFill" style="width:0%"></span></div>
+
+          <div style="margin-top:10px">
+            <div class="muted">My submissions</div>
+            <ul id="myList" class="list"></ul>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- RIGHT: Teacher Dashboard -->
+      <div>
+        <section id="teacherPanel" class="card hidden fade-in" aria-hidden="true">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <strong>Teacher Dashboard</strong>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input id="searchInput" placeholder="Search student" style="padding:8px;border-radius:8px;width:220px;background:transparent;border:1px solid rgba(255,255,255,0.04)" />
+              <select id="filterStatus" style="padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04)">
+                <option value="all">All students</option>
+                <option value="missing">Missing any</option>
+                <option value="late">Late any</option>
+                <option value="complete">All submitted</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-wrap" style="margin-top:10px">
+            <table id="teacherTable" role="table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Title</th>
+                  <th>Chapter 1</th>
+                  <th>Chapter 2</th>
+                  <th>Final</th>
+                  <th>Progress</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div class="charts">
+            <div class="chart-card">
+              <div class="muted">Submission breakdown</div>
+              <canvas id="pieChart"></canvas>
+            </div>
+            <div class="chart-card">
+              <div class="muted">On-time vs Late</div>
+              <canvas id="barChart"></canvas>
+            </div>
+          </div>
+
+        </section>
+      </div>
+
+    </div>
+
+    <footer>
+      <small>Tip: Open this file with VS Code Live Server (right-click → Open with Live Server). Files are stored locally in your browser for presentation.</small>
+    </footer>
+  </main>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+
+  <script>
+    /* ======= App: local-only, presentation-grade ======= */
+    (function(){
+      const DEADLINES = {
+        'Title': '2025-01-20',
+        'Chapter 1': '2025-02-10',
+        'Chapter 2': '2025-03-01',
+        'Final Output': '2025-03-20'
+      };
+
+      // UI refs
+      const pillStudent = document.getElementById('pillStudent');
+      const pillTeacher = document.getElementById('pillTeacher');
+      const nameInput = document.getElementById('nameInput');
+      const btnEnter = document.getElementById('btnEnter');
+      const btnGuest = document.getElementById('btnGuest');
+      const userInfo = document.getElementById('userInfo');
+
+      const loginCard = document.getElementById('loginCard');
+      const studentPanel = document.getElementById('studentPanel');
+      const teacherPanel = document.getElementById('teacherPanel');
+
+      const stageSelect = document.getElementById('stageSelect');
+      const fileInput = document.getElementById('fileInput');
+      const btnUpload = document.getElementById('btnUpload');
+      const btnSaveLocal = document.getElementById('btnSaveLocal');
+      const myList = document.getElementById('myList');
+      const progressFill = document.getElementById('progressFill');
+
+      const teacherTbody = document.querySelector('#teacherTable tbody');
+      const searchInput = document.getElementById('searchInput');
+      const filterStatus = document.getElementById('filterStatus');
+
+      const btnReset = document.getElementById('btnReset');
+      const btnSample = document.getElementById('btnSample');
+      const btnExport = document.getElementById('btnExport');
+
+      // charts
+      let pieChart=null, barChart=null;
+
+      // state
+      let role = 'student';
+      let current = null; // name
+      // data structure: { students: { [name]: { submissions: {stage:{fileName, submittedAt}} } } }
+      const STORAGE_KEY = 'research_hub_presentation_v1';
+
+      function loadState(){
+        try{const raw = localStorage.getItem(STORAGE_KEY);return raw?JSON.parse(raw):{students:{}}}catch(e){console.warn(e);return {students:{}}}
+      }
+      function saveState(s){localStorage.setItem(STORAGE_KEY, JSON.stringify(s))}
+
+      let store = loadState();
+
+      // UI helpers
+      function setRole(r){role=r; pillStudent.classList.toggle('active', r==='student'); pillTeacher.classList.toggle('active', r==='teacher')}
+      pillStudent.addEventListener('click', ()=>setRole('student'));
+      pillTeacher.addEventListener('click', ()=>setRole('teacher'));
+
+      btnGuest.addEventListener('click', ()=>{nameInput.value = 'Guest Student'; setRole('student'); signIn();});
+      btnEnter.addEventListener('click', signIn);
+
+      function signIn(){
+        const name = (nameInput.value||'').trim();
+        if(!name){alert('Please enter a name. For class demo you can use "Guest Student".');return}
+        current = name; userInfo.textContent = `Signed in: ${name} · Role: ${role}`;
+        loginCard.classList.add('hidden');
+        if(role==='student'){studentPanel.classList.remove('hidden'); teacherPanel.classList.add('hidden'); renderStudent();}
+        else{teacherPanel.classList.remove('hidden'); studentPanel.classList.add('hidden'); renderTeacher();}
+        // ensure student exists
+        if(!store.students[name]){store.students[name]={submissions:{Title:null,'Chapter 1':null,'Chapter 2':null,'Final Output':null}}; saveState(store)}
+      }
+
+      // upload (local meta only) — we cannot persist file bytes across sessions safely, so we store file.name and timestamp
+      btnUpload.addEventListener('click', ()=>{
+        if(!current){alert('Sign in first');return}
+        const stage = stageSelect.value; const f = fileInput.files[0];
+        if(!f){alert('Pick a file to upload (demo stores filename only).');return}
+        const meta = {fileName: f.name, submittedAt: new Date().toISOString()};
+        store.students[current].submissions[stage] = meta; saveState(store); renderStudent(); renderTeacher(); fileInput.value='';
+        // animate progress
+        const completed = computeCompletion(current); progressFill.style.width = completed + '%';
+      });
+
+      btnSaveLocal.addEventListener('click', ()=>{alert('Draft saved locally — demo uses browser storage.');});
+
+      function renderStudent(){
+        const s = store.students[current]; if(!s) return; myList.innerHTML=''; let done=0; let total=4;
+        for(const k of Object.keys(s.submissions)){
+          const li = document.createElement('li'); const sub = s.submissions[k];
+          const when = sub?`<small class="muted"> — ${new Date(sub.submittedAt).toLocaleString()}</small>`:'';
+          li.innerHTML = `<strong>${k}:</strong> ${sub?sub.fileName:'<span class="muted">Missing</span>'}${when}`;
+          myList.appendChild(li); if(sub) done++;
+        }
+        const pct = Math.round((done/total)*100); progressFill.style.width = pct + '%';
+      }
+
+      function computeCompletion(name){const s=store.students[name]; if(!s) return 0; const total=4; let c=0; for(const k in s.submissions) if(s.submissions[k]) c++; return Math.round((c/total)*100)}
+
+      // teacher rendering
+      function renderTeacher(){
+        const rows = Object.entries(store.students).map(([name,data])=>({name,submissions:data.submissions}));
+        renderTeacherTable(rows);
+        renderCharts(rows);
+      }
+
+      function renderTeacherTable(rows){
+        const q = (searchInput.value||'').toLowerCase(); const filter = filterStatus.value;
+        teacherTbody.innerHTML='';
+        for(const r of rows){
+          if(q && !r.name.toLowerCase().includes(q)) continue;
+          const anyMissing = Object.values(r.submissions).some(x=>!x);
+          const anyLate = checkAnyLate(r.submissions);
+          const allDone = !anyMissing;
+          if(filter==='missing' && !anyMissing) continue; if(filter==='late' && !anyLate) continue; if(filter==='complete' && !allDone) continue;
+
+          const tr = document.createElement('tr');
+          const tdName = document.createElement('td'); tdName.textContent = r.name; tr.appendChild(tdName);
+          let completed = 0;
+          for(const key of Object.keys(r.submissions)){
+            const td = document.createElement('td'); td.className='status'; const sub=r.submissions[key];
+            if(sub){td.textContent='Submitted'; td.classList.add('green'); completed++;}
+            else{
+              // check deadline nearing
+              const color = nearDeadlineColor(key);
+              td.textContent = color==='yellow'?'Near deadline':'Missing'; td.classList.add(color==='yellow'?'yellow':'red');
+            }
+            tr.appendChild(td);
+          }
+          const pct = Math.round((completed/4)*100);
+          const tdProg = document.createElement('td'); tdProg.textContent = `${pct}%`; tr.appendChild(tdProg);
+          teacherTbody.appendChild(tr);
+        }
+      }
+
+      function nearDeadlineColor(stage){const dl = new Date(DEADLINES[stage] + 'T23:59:59'); const now = new Date(); const days = (dl - now)/(1000*60*60*24); if(days>=0 && days<=3) return 'yellow'; return 'red'}
+      function checkAnyLate(subs){for(const k in subs){const s=subs[k]; if(!s) continue; const submitted = new Date(s.submittedAt); const dl = new Date(DEADLINES[k] + 'T23:59:59'); if(submitted>dl) return true}return false}
+
+      // charts
+      function renderCharts(rows){
+        const stages = Object.keys(DEADLINES);
+        const counts = stages.map(k => rows.reduce((acc,r)=> acc + (r.submissions[k]?1:0), 0));
+        // ontime vs late
+        let on=0, late=0, unknown=0;
+        for(const r of rows){
+          for(const k of stages){const s = r.submissions[k]; if(!s) continue; const sub = new Date(s.submittedAt); const dl = new Date(DEADLINES[k] + 'T23:59:59'); if(isNaN(sub)) unknown++; else if(sub<=dl) on++; else late++;}
+        }
+
+        // pie
+        const pieCtx = document.getElementById('pieChart').getContext('2d');
+        if(pieChart) pieChart.destroy();
+        pieChart = new Chart(pieCtx, {type:'pie', data:{labels:stages, datasets:[{data:counts}]}, options:{plugins:{legend:{position:'bottom'}}}});
+
+        // bar
+        const barCtx = document.getElementById('barChart').getContext('2d');
+        if(barChart) barChart.destroy();
+        barChart = new Chart(barCtx, {type:'bar', data:{labels:['On-time','Late','Unknown'], datasets:[{label:'submissions',data:[on,late,unknown]}]}, options:{plugins:{legend:{display:false}}}});
+      }
+
+      // controls: search / filter
+      searchInput.addEventListener('input', renderTeacher);
+      filterStatus.addEventListener('change', renderTeacher);
+
+      // reset/sample/export
+      btnReset.addEventListener('click', ()=>{if(confirm('Reset demo data?')){store={students:{}}; saveState(store); location.reload()}});
+
+      btnSample.addEventListener('click', ()=>{
+        // create 6 sample students with mixed statuses
+        const sample = ['Ana Santos','Miguel Reyes','Liza Cruz','Ramon Dela Rosa','Karla Lim','Josefa Tan'];
+        sample.forEach((name,i)=>{
+          store.students[name]={submissions:{Title:null,'Chapter 1':null,'Chapter 2':null,'Final Output':null}};
+          // give some submissions
+          if(i%2===0) store.students[name].submissions['Title']={fileName:'title.docx',submittedAt:'2025-01-18T10:00:00Z'};
+          if(i%3===0) store.students[name].submissions['Chapter 1']={fileName:'ch1.pdf',submittedAt:'2025-02-09T14:00:00Z'};
+          if(i%4===0) store.students[name].submissions['Chapter 2']={fileName:'ch2.docx',submittedAt:'2025-03-02T08:00:00Z'}; // late
+          if(i%5===0) store.students[name].submissions['Final Output']={fileName:'final.zip',submittedAt:'2025-03-15T09:00:00Z'};
+        });
+        saveState(store); alert('Sample students loaded'); renderTeacher();
+      });
+
+      btnExport.addEventListener('click', ()=>{
+        // export CSV
+        const rows = [['Student','Title','Chapter 1','Chapter 2','Final Output','Progress%']];
+        for(const [name,data] of Object.entries(store.students)){
+          const subs = data.submissions;
+          const vals = [name, subs['Title']?subs['Title'].fileName:'', subs['Chapter 1']?subs['Chapter 1'].fileName:'', subs['Chapter 2']?subs['Chapter 2'].fileName:'', subs['Final Output']?subs['Final Output'].fileName:'', computeCompletion(name)+"%"];
+          rows.push(vals);
+        }
+        const csv = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+        const blob = new Blob([csv],{type:'text/csv'}); const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href=url; a.download='research_hub_export.csv'; a.click(); URL.revokeObjectURL(url);
+      });
+
+      // initial render
+      // if there is already one user in storage we can auto-show teacher panel for demo
+      if(Object.keys(store.students).length>0){renderTeacher()}
+
+      // expose debug for demo
+      window._RH = {store, saveState, renderTeacher, renderStudent};
+
+    })();
+  </script>
+</body>
+</html>
